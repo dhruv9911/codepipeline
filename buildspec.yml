@@ -1,0 +1,86 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_REGION: ap-south-1
+    ACCOUNT_ID: 332734770702
+    REPOSITORY_NAME: sample-repo
+    REPOSITORY_URI: 332734770702.dkr.ecr.ap-south-1.amazonaws.com/sample-repo
+
+phases:
+
+  install:
+    commands:
+
+      - echo "Installing Security Tools"
+
+      # -----------------------------
+      # Install Hadolint
+      # -----------------------------
+      - wget -q https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
+      - chmod +x hadolint-Linux-x86_64
+      - mv hadolint-Linux-x86_64 /usr/local/bin/hadolint
+
+      # -----------------------------
+      # Install Trivy
+      # -----------------------------
+      - wget -q https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.66.0_Linux-64bit.tar.gz
+      - tar -xzf trivy_0.66.0_Linux-64bit.tar.gz
+      - mv trivy /usr/local/bin/
+
+  pre_build:
+
+    commands:
+
+      - echo "Docker Version"
+      - docker --version
+
+      - echo "AWS CLI Version"
+      - aws --version
+
+      - echo "Dockerfile Security Scan"
+      - hadolint Dockerfile
+
+      - echo "Filesystem Vulnerability Scan"
+      - trivy fs --severity HIGH,CRITICAL --exit-code 1 .
+
+      - echo "Login to Amazon ECR"
+
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+
+      - IMAGE_TAG=${COMMIT_HASH}
+
+  build:
+
+    commands:
+
+      - echo "Building Docker Image"
+
+      - docker build -t $REPOSITORY_URI:latest .
+
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+
+      - docker images
+
+  post_build:
+
+    commands:
+
+      - echo "Scanning Docker Image"
+
+      - trivy image --severity HIGH,CRITICAL --exit-code 1 $REPOSITORY_URI:latest
+
+      - echo "Pushing Docker Images"
+
+      - docker push $REPOSITORY_URI:latest
+
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+
+      - printf '[{"name":"sample-container","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
+
+artifacts:
+
+  files:
+    - imagedefinitions.json
