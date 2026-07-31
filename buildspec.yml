@@ -58,7 +58,7 @@ phases:
 
       # Change exit-code to 1 if you want to block the pipeline
       - trivy image --format json --output trivy-report.json --severity HIGH,CRITICAL --exit-code 0 $REPOSITORY_URI:latest
-      - - aws s3 cp trivy-report.json s3://$REPORT_BUCKET/trivy/$CODEBUILD_BUILD_NUMBER/trivy-report.json
+      - aws s3 cp trivy-report.json s3://$REPORT_BUCKET/trivy/$CODEBUILD_BUILD_NUMBER/trivy-report.json
 
       - echo "========================================"
       - echo "Logging into Amazon ECR"
