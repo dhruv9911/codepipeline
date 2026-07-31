@@ -47,13 +47,7 @@ phases:
 
       - echo "========== Filesystem Scan =========="
 
-      - trivy fs \
-          --format json \
-          --output trivy-fs-report.json \
-          --severity HIGH,CRITICAL \
-          --exit-code 0 \
-          .
-
+      - trivy image --format json --output trivy-image-report.json --severity HIGH,CRITICAL --exit-code 0 $REPOSITORY_URI:latest
       - aws s3 cp trivy-fs-report.json s3://$REPORT_BUCKET/trivy/$CODEBUILD_BUILD_NUMBER/trivy-fs-report.json
 
       - echo "========== Login to Amazon ECR =========="
