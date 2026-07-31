@@ -73,7 +73,7 @@ phases:
 
       - cat trivy-summary.json | head -100
 
-      - aws s3 cp trivy-report.txt s3://$REPORT_BUCKET/trivy/$CODEBUILD_BUILD_NUMBER/trivy-summary.json
+      - aws s3 cp trivy-summary.json s3://$REPORT_BUCKET/trivy/$CODEBUILD_BUILD_NUMBER/trivy-summary.json
 
       - echo "========== Push Image =========="
 
