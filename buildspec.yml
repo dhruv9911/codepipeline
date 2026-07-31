@@ -5,7 +5,7 @@ env:
     AWS_REGION: ap-south-1
     ACCOUNT_ID: "332734770702"
     REPOSITORY_NAME: "sample-repo"
-    REPOSITORY_URI: "332734770702.dkr.ecr.ap-south-1.amazonaws.com/sample-repo"
+    REPOSITORY_URI: "332734770702.dkr.ecr.ap-south-1.amazonaws.com/nginx-app"
     REPORT_BUCKET: "technical-guftugu-demo-bucket"
 
 phases:
