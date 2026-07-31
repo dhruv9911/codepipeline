@@ -70,9 +70,9 @@ phases:
 
       - trivy image --scanners vuln --severity HIGH,CRITICAL --format table --output trivy-report.txt $REPOSITORY_URI:latest
 
-      - cat trivy-image-report.json | head -100
+      - cat trivy-report.txt | head -100
 
-      - aws s3 cp trivy-image-report.json s3://$REPORT_BUCKET/trivy/$CODEBUILD_BUILD_NUMBER/trivy-image-report.json
+      - aws s3 cp trivy-report.txt s3://$REPORT_BUCKET/trivy/$CODEBUILD_BUILD_NUMBER/trivy-report.txt
 
       - echo "========== Push Image =========="
 
