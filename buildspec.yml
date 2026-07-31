@@ -45,11 +45,6 @@ phases:
 
       - aws s3 cp hadolint-report.txt s3://$REPORT_BUCKET/hadolint/$CODEBUILD_BUILD_NUMBER/hadolint-report.txt
 
-      - echo "========== Filesystem Scan =========="
-
-      - trivy image --format json --output trivy-image-report.json --severity HIGH,CRITICAL --exit-code 0 $REPOSITORY_URI:latest
-      - aws s3 cp trivy-fs-report.json s3://$REPORT_BUCKET/trivy/$CODEBUILD_BUILD_NUMBER/trivy-fs-report.json
-
       - echo "========== Login to Amazon ECR =========="
 
       - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
@@ -73,12 +68,7 @@ phases:
 
       - echo "========== Docker Image Scan =========="
 
-      - trivy image \
-          --format json \
-          --output trivy-image-report.json \
-          --severity HIGH,CRITICAL \
-          --exit-code 0 \
-          $REPOSITORY_URI:latest
+      - trivy image --format json --output trivy-image-report.json --severity HIGH,CRITICAL --exit-code 0 $REPOSITORY_URI:latest
 
       - cat trivy-image-report.json | head -100
 
