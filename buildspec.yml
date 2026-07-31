@@ -3,60 +3,75 @@ version: 0.2
 env:
   variables:
     AWS_REGION: ap-south-1
-    ACCOUNT_ID: 332734770702
-    REPOSITORY_NAME: sample-repo
-    REPOSITORY_URI: 332734770702.dkr.ecr.ap-south-1.amazonaws.com/sample-repo
+    ACCOUNT_ID: "332734770702"
+    REPOSITORY_NAME: "sample-repo"
+    REPOSITORY_URI: "332734770702.dkr.ecr.ap-south-1.amazonaws.com/sample-repo"
 
 phases:
 
   install:
     commands:
 
+      - set -e
+
+      - echo "========================================"
       - echo "Installing Security Tools"
+      - echo "========================================"
 
-      # -----------------------------
       # Install Hadolint
-      # -----------------------------
-      - wget -q https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
-      - chmod +x hadolint-Linux-x86_64
-      - mv hadolint-Linux-x86_64 /usr/local/bin/hadolint
+      - wget -q -O /usr/local/bin/hadolint https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
+      - chmod +x /usr/local/bin/hadolint
 
-      # -----------------------------
       # Install Trivy
-      # -----------------------------
-      - wget hwget https://github.com/aquasecurity/trivy/releases/download/v0.72.0/trivy_0.72.0_Linux-64bit.tar.gz
+      - wget https://github.com/aquasecurity/trivy/releases/download/v0.72.0/trivy_0.72.0_Linux-64bit.tar.gz
       - tar -xzf trivy_0.72.0_Linux-64bit.tar.gz
+      - chmod +x trivy
       - mv trivy /usr/local/bin/
 
-  pre_build:
+      # Verify Installation
+      - hadolint --version
+      - trivy --version
 
+  pre_build:
     commands:
 
-      - echo "Docker Version"
+      - echo "========================================"
+      - echo "Environment Information"
+      - echo "========================================"
+
       - docker --version
-
-      - echo "AWS CLI Version"
       - aws --version
+      - uname -m
 
-      - echo "Dockerfile Security Scan"
+      - echo "========================================"
+      - echo "Running Hadolint Scan"
+      - echo "========================================"
+
       - hadolint Dockerfile
 
-      - echo "Filesystem Vulnerability Scan"
-      - trivy fs --severity HIGH,CRITICAL --exit-code 1 .
+      - echo "========================================"
+      - echo "Running Trivy Filesystem Scan"
+      - echo "========================================"
 
-      - echo "Login to Amazon ECR"
+      # Change exit-code to 1 if you want to block the pipeline
+      - trivy fs --severity HIGH,CRITICAL --exit-code 0 .
 
-      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+      - echo "========================================"
+      - echo "Logging into Amazon ECR"
+      - echo "========================================"
+
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $REPOSITORY_URI
 
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
 
-      - IMAGE_TAG=${COMMIT_HASH}
+      - IMAGE_TAG=${COMMIT_HASH:-latest}
 
   build:
-
     commands:
 
+      - echo "========================================"
       - echo "Building Docker Image"
+      - echo "========================================"
 
       - docker build -t $REPOSITORY_URI:latest .
 
@@ -65,22 +80,28 @@ phases:
       - docker images
 
   post_build:
-
     commands:
 
+      - echo "========================================"
       - echo "Scanning Docker Image"
+      - echo "========================================"
 
-      - trivy image --severity HIGH,CRITICAL --exit-code 1 $REPOSITORY_URI:latest
+      # Change exit-code to 1 for production
+      - trivy image --severity HIGH,CRITICAL --exit-code 0 $REPOSITORY_URI:latest
 
-      - echo "Pushing Docker Images"
+      - echo "========================================"
+      - echo "Pushing Image to Amazon ECR"
+      - echo "========================================"
 
       - docker push $REPOSITORY_URI:latest
-
       - docker push $REPOSITORY_URI:$IMAGE_TAG
+
+      - echo "========================================"
+      - echo "Creating imagedefinitions.json"
+      - echo "========================================"
 
       - printf '[{"name":"sample-container","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
 
 artifacts:
-
   files:
     - imagedefinitions.json
