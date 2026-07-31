@@ -24,8 +24,8 @@ phases:
       # -----------------------------
       # Install Trivy
       # -----------------------------
-      - wget https://github.com/aquasecurity/trivy/releases/download/v0.66.0/trivy_0.66.0_Linux-64bit.tar.gz
-      - tar -xzf trivy_0.66.0_Linux-64bit.tar.gz
+      - wget hwget https://github.com/aquasecurity/trivy/releases/download/v0.72.0/trivy_0.72.0_Linux-64bit.tar.gz
+      - tar -xzf trivy_0.72.0_Linux-64bit.tar.gz
       - mv trivy /usr/local/bin/
 
   pre_build:
