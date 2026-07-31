@@ -68,7 +68,7 @@ phases:
 
       - echo "========== Docker Image Scan =========="
 
-      - trivy image --format json --output trivy-image-report.json --severity HIGH,CRITICAL --exit-code 0 $REPOSITORY_URI:latest
+      - trivy image --scanners vuln --severity HIGH,CRITICAL --format table --output trivy-report.txt $REPOSITORY_URI:latest
 
       - cat trivy-image-report.json | head -100
 
