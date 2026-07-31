@@ -2,9 +2,9 @@ version: 0.2
 
 env:
   variables:
-    AWS_REGION: ap-south-1
+    AWS_REGION: "ap-south-1"
     ACCOUNT_ID: "332734770702"
-    REPOSITORY_NAME: "sample-repo"
+    REPOSITORY_NAME: "nginx-app"
     REPOSITORY_URI: "332734770702.dkr.ecr.ap-south-1.amazonaws.com/nginx-app"
     REPORT_BUCKET: "technical-guftugu-demo-bucket"
 
@@ -12,70 +12,61 @@ phases:
 
   install:
     commands:
-
       - set -e
 
-      - echo "========================================"
-      - echo "Installing Security Tools"
-      - echo "========================================"
+      - echo "========== Installing Security Tools =========="
 
       # Install Hadolint
       - wget -q -O /usr/local/bin/hadolint https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
       - chmod +x /usr/local/bin/hadolint
 
       # Install Trivy
-      - wget https://github.com/aquasecurity/trivy/releases/download/v0.72.0/trivy_0.72.0_Linux-64bit.tar.gz
+      - wget -q https://github.com/aquasecurity/trivy/releases/download/v0.72.0/trivy_0.72.0_Linux-64bit.tar.gz
       - tar -xzf trivy_0.72.0_Linux-64bit.tar.gz
       - chmod +x trivy
       - mv trivy /usr/local/bin/
 
-      # Verify Installation
+      # Verify installation
       - hadolint --version
       - trivy --version
 
   pre_build:
     commands:
 
-      - echo "========================================"
-      - echo "Environment Information"
-      - echo "========================================"
-
+      - echo "========== Environment =========="
       - docker --version
       - aws --version
       - uname -m
 
-      - echo "========================================"
-      - echo "Running Hadolint Scan"
-      - echo "========================================"
+      - echo "========== Dockerfile Scan =========="
 
       - hadolint Dockerfile > hadolint-report.txt || true
       - cat hadolint-report.txt
-      - aws s3 cp hadolint-report.txt s3://$REPORT_BUCKET/hadolint/
 
-      - echo "========================================"
-      - echo "Running Trivy Filesystem Scan"
-      - echo "========================================"
+      - aws s3 cp hadolint-report.txt s3://$REPORT_BUCKET/hadolint/$CODEBUILD_BUILD_NUMBER/hadolint-report.txt
 
-      # Change exit-code to 1 if you want to block the pipeline
-      - trivy image --format json --output trivy-report.json --severity HIGH,CRITICAL --exit-code 0 $REPOSITORY_URI:latest
-      - aws s3 cp trivy-report.json s3://$REPORT_BUCKET/trivy/$CODEBUILD_BUILD_NUMBER/trivy-report.json
+      - echo "========== Filesystem Scan =========="
 
-      - echo "========================================"
-      - echo "Logging into Amazon ECR"
-      - echo "========================================"
+      - trivy fs \
+          --format json \
+          --output trivy-fs-report.json \
+          --severity HIGH,CRITICAL \
+          --exit-code 0 \
+          .
 
-      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $REPOSITORY_URI
+      - aws s3 cp trivy-fs-report.json s3://$REPORT_BUCKET/trivy/$CODEBUILD_BUILD_NUMBER/trivy-fs-report.json
+
+      - echo "========== Login to Amazon ECR =========="
+
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-
       - IMAGE_TAG=${COMMIT_HASH:-latest}
 
   build:
     commands:
 
-      - echo "========================================"
-      - echo "Building Docker Image"
-      - echo "========================================"
+      - echo "========== Building Docker Image =========="
 
       - docker build -t $REPOSITORY_URI:latest .
 
@@ -86,23 +77,23 @@ phases:
   post_build:
     commands:
 
-      - echo "========================================"
-      - echo "Scanning Docker Image"
-      - echo "========================================"
+      - echo "========== Docker Image Scan =========="
 
-      # Change exit-code to 1 for production
-      - trivy image --severity HIGH,CRITICAL --exit-code 0 $REPOSITORY_URI:latest
+      - trivy image \
+          --format json \
+          --output trivy-image-report.json \
+          --severity HIGH,CRITICAL \
+          --exit-code 0 \
+          $REPOSITORY_URI:latest
 
-      - echo "========================================"
-      - echo "Pushing Image to Amazon ECR"
-      - echo "========================================"
+      - cat trivy-image-report.json | head -100
+
+      - aws s3 cp trivy-image-report.json s3://$REPORT_BUCKET/trivy/$CODEBUILD_BUILD_NUMBER/trivy-image-report.json
+
+      - echo "========== Push Image =========="
 
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
-
-      - echo "========================================"
-      - echo "Creating imagedefinitions.json"
-      - echo "========================================"
 
       - printf '[{"name":"sample-container","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
 
