@@ -36,7 +36,7 @@ phases:
       - echo "========== Environment =========="
       - docker --version
       - aws --version
-      - uname -m
+      - yum install -y jq
 
       - echo "========== Dockerfile Scan =========="
 
@@ -68,11 +68,12 @@ phases:
 
       - echo "========== Docker Image Scan =========="
 
-      - trivy image --scanners vuln --severity HIGH,CRITICAL --format table $REPOSITORY_URI:latest | sed 's/[^[:print:]\t]//g' > trivy-report.txt
+      - trivy image --format json --output trivy-report.json --severity LOW,MEDIUM,HIGH,CRITICAL --exit-code 0 $REPOSITORY_URI:latest
+      - jq '{reportSummary:{target:.ArtifactName,os:{name:.Metadata.OS.Family,version:.Metadata.OS.Name},scanType:"OS Package Scan",vulnerabilities:{critical:([.Results[].Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length),high:([.Results[].Vulnerabilities[]? | select(.Severity=="HIGH")] | length),medium:([.Results[].Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length),low:([.Results[].Vulnerabilities[]? | select(.Severity=="LOW")] | length),unknown:([.Results[].Vulnerabilities[]? | select(.Severity=="UNKNOWN")] | length),total:([.Results[].Vulnerabilities[]?] | length)},status:(if ([.Results[].Vulnerabilities[]?] | length)==0 then "Clean" else "Vulnerable" end)}}' trivy-report.json > trivy-summary.json
 
-      - cat trivy-report.txt | head -100
+      - cat trivy-summary.json | head -100
 
-      - aws s3 cp trivy-report.txt s3://$REPORT_BUCKET/trivy/$CODEBUILD_BUILD_NUMBER/trivy-report.txt
+      - aws s3 cp trivy-report.txt s3://$REPORT_BUCKET/trivy/$CODEBUILD_BUILD_NUMBER/trivy-summary.json
 
       - echo "========== Push Image =========="
 
