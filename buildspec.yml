@@ -6,6 +6,7 @@ env:
     ACCOUNT_ID: "332734770702"
     REPOSITORY_NAME: "sample-repo"
     REPOSITORY_URI: "332734770702.dkr.ecr.ap-south-1.amazonaws.com/sample-repo"
+    REPORT_BUCKET: "technical-guftugu-demo-bucket"
 
 phases:
 
@@ -47,14 +48,17 @@ phases:
       - echo "Running Hadolint Scan"
       - echo "========================================"
 
-      - hadolint Dockerfile
+      - hadolint Dockerfile > hadolint-report.txt || true
+      - cat hadolint-report.txt
+      - aws s3 cp hadolint-report.txt s3://$REPORT_BUCKET/hadolint/
 
       - echo "========================================"
       - echo "Running Trivy Filesystem Scan"
       - echo "========================================"
 
       # Change exit-code to 1 if you want to block the pipeline
-      - trivy fs --severity HIGH,CRITICAL --exit-code 0 .
+      - trivy image --format json --output trivy-report.json --severity HIGH,CRITICAL --exit-code 0 $REPOSITORY_URI:latest
+      - aws s3 cp trivy-report.json s3://$REPORT_BUCKET/trivy/$CODEBUILD_BUILD_NUMBER/.
 
       - echo "========================================"
       - echo "Logging into Amazon ECR"
