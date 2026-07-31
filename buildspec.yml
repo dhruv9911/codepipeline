@@ -68,7 +68,7 @@ phases:
 
       - echo "========== Docker Image Scan =========="
 
-      - trivy image --scanners vuln --severity HIGH,CRITICAL --format table --output trivy-report.txt $REPOSITORY_URI:latest
+      - trivy image --scanners vuln --severity HIGH,CRITICAL --format table $REPOSITORY_URI:latest | sed 's/[^[:print:]\t]//g' > trivy-report.txt
 
       - cat trivy-report.txt | head -100
 
