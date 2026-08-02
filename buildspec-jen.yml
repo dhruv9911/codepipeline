@@ -2,7 +2,7 @@ version: 0.2
 
 env:
   variables:
-    JENKINS_URL: "http://13.233.201.86:8080"
+    JENKINS_URL: "http://13.126.119.218:8080"
     JENKINS_JOB: "Demo"
     JENKINS_USER: "vivek"
     JENKINS_API_TOKEN: "1134616cab0f186a88025b8514ba4993a2"
