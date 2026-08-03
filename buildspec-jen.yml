@@ -2,10 +2,10 @@ version: 0.2
 
 env:
   variables:
-    JENKINS_URL: "http://43.204.148.148:8080"
+    JENKINS_URL: "http://3.110.46.194:8080"
     JENKINS_JOB: "Demo"
     JENKINS_USER: "vivek"
-    JENKINS_API_TOKEN: "1134616cab0f186a88025b8514ba4993a2"
+    JENKINS_API_TOKEN: "118e79847a53d29dff96a843f9609bb0ec"
     JENKINS_BUILD_TOKEN: "ecr-pipeline-token"
 
 phases:
