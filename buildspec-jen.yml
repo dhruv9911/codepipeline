@@ -2,7 +2,7 @@ version: 0.2
 
 env:
   variables:
-    JENKINS_URL: "http://43.204.148.148:8080"
+    JENKINS_URL: "http://13.126.119.218:8080"
     JENKINS_JOB: "Demo"
     JENKINS_USER: "vivek"
     JENKINS_API_TOKEN: "1134616cab0f186a88025b8514ba4993a2"
@@ -10,12 +10,18 @@ env:
 
 phases:
 
+  install:
+    commands:
+      - yum install -y jq curl
+
   build:
     commands:
 
-      - echo "================================"
-      - echo "Triggering Jenkins Build"
-      - echo "==============================="
+      - echo "========================================"
+      - echo "Triggering Jenkins Job"
+      - echo "========================================"
+
+      - echo "Commit ID : ${CODEBUILD_RESOLVED_SOURCE_VERSION}"
 
       - |
         RESPONSE_HEADERS=$(mktemp)
@@ -34,7 +40,7 @@ phases:
         echo "Queue URL : ${QUEUE_URL}"
 
         if [ -z "$QUEUE_URL" ]; then
-          echo "Unable to get Queue URL"
+          echo "Unable to obtain Jenkins Queue URL"
           exit 1
         fi
 
@@ -55,36 +61,32 @@ phases:
             echo "Build Number : ${BUILD_NUMBER}"
         done
 
-      - |
-        echo "========================================"
-        echo "Jenkins Build Started : ${BUILD_NUMBER}"
-        echo "========================================"
+      - echo "Jenkins Build Number : ${BUILD_NUMBER}"
 
       - |
+        echo "Waiting for Jenkins build to finish..."
+
         BUILDING="true"
 
         while [ "$BUILDING" = "true" ]
         do
+            sleep 10
 
-          sleep 10
+            JSON=$(curl -s \
+            -u ${JENKINS_USER}:${JENKINS_API_TOKEN} \
+            ${JENKINS_URL}/job/${JENKINS_JOB}/${BUILD_NUMBER}/api/json)
 
-          JSON=$(curl -s \
-          -u ${JENKINS_USER}:${JENKINS_API_TOKEN} \
-          ${JENKINS_URL}/job/${JENKINS_JOB}/${BUILD_NUMBER}/api/json)
+            BUILDING=$(echo "$JSON" | jq -r '.building')
+            RESULT=$(echo "$JSON" | jq -r '.result')
 
-          BUILDING=$(echo "$JSON" | jq -r '.building')
-
-          RESULT=$(echo "$JSON" | jq -r '.result')
-
-          echo "Status : building=${BUILDING} result=${RESULT}"
+            echo "Building=${BUILDING} Result=${RESULT}"
 
         done
 
       - |
-        echo ""
-        echo "=============================="
+        echo "========================================"
         echo "Jenkins Console Output"
-        echo "=============================="
+        echo "========================================"
 
         curl -s \
         -u ${JENKINS_USER}:${JENKINS_API_TOKEN} \
@@ -96,13 +98,13 @@ phases:
         ${JENKINS_URL}/job/${JENKINS_JOB}/${BUILD_NUMBER}/api/json \
         | jq -r '.result')
 
-        echo "Final Result : ${RESULT}"
+        echo "Final Jenkins Result : ${RESULT}"
 
-        if [ "$RESULT" = "SUCCESS" ]; then
-            echo "Jenkins Build Successful"
+        if [ "${RESULT}" = "SUCCESS" ]; then
+            echo "CodePipeline SUCCESS"
             exit 0
         else
-            echo "Jenkins Build Failed"
+            echo "CodePipeline FAILED"
             exit 1
         fi
 
