@@ -9,103 +9,101 @@ env:
     JENKINS_BUILD_TOKEN: "ecr-pipeline-token"
 
 phases:
-
   install:
     commands:
       - yum install -y jq curl
 
   build:
     commands:
-
-      - echo "========================================"
-      - echo "Triggering Jenkins Job"
-      - echo "========================================"
-
-      - echo "Commit ID : ${CODEBUILD_RESOLVED_SOURCE_VERSION}"
-
       - |
+        #!/bin/bash
+        set -e
+
+        echo "========================================"
+        echo "Triggering Jenkins Job"
+        echo "========================================"
+
+        echo "Commit ID: ${CODEBUILD_RESOLVED_SOURCE_VERSION}"
+
         RESPONSE_HEADERS=$(mktemp)
 
         curl -i -s -X POST \
-        "${JENKINS_URL}/job/${JENKINS_JOB}/buildWithParameters" \
-        -u "${JENKINS_USER}:${JENKINS_API_TOKEN}" \
-        --data-urlencode "token=${JENKINS_BUILD_TOKEN}" \
-        --data-urlencode "SOURCE_VERSION=${CODEBUILD_RESOLVED_SOURCE_VERSION}" \
-        -D ${RESPONSE_HEADERS} \
-        -o /dev/null
+          "${JENKINS_URL}/job/${JENKINS_JOB}/buildWithParameters" \
+          -u "${JENKINS_USER}:${JENKINS_API_TOKEN}" \
+          --data-urlencode "token=${JENKINS_BUILD_TOKEN}" \
+          --data-urlencode "SOURCE_VERSION=${CODEBUILD_RESOLVED_SOURCE_VERSION}" \
+          -D "${RESPONSE_HEADERS}" \
+          -o /dev/null
 
-      - |
-        QUEUE_URL=$(grep -i "^Location:" ${RESPONSE_HEADERS} | awk '{print $2}' | tr -d '\r')
+        QUEUE_URL=$(grep -i "^Location:" "${RESPONSE_HEADERS}" | awk '{print $2}' | tr -d '\r')
 
-        echo "Queue URL : ${QUEUE_URL}"
-
-        if [ -z "$QUEUE_URL" ]; then
-          echo "Unable to obtain Jenkins Queue URL"
+        if [ -z "${QUEUE_URL}" ]; then
+          echo "ERROR: Unable to obtain Jenkins Queue URL"
           exit 1
         fi
 
-      - |
+        echo "Queue URL: ${QUEUE_URL}"
+
         echo "Waiting for Jenkins to assign Build Number..."
 
         BUILD_NUMBER=""
 
-        while [ -z "$BUILD_NUMBER" ]
+        until [ -n "${BUILD_NUMBER}" ]
         do
-            sleep 5
+          sleep 5
 
-            BUILD_NUMBER=$(curl -s \
-            -u ${JENKINS_USER}:${JENKINS_API_TOKEN} \
-            ${QUEUE_URL}api/json \
-            | jq -r '.executable.number // empty')
+          BUILD_NUMBER=$(curl -s \
+            -u "${JENKINS_USER}:${JENKINS_API_TOKEN}" \
+            "${QUEUE_URL}api/json" | jq -r '.executable.number // empty')
 
-            echo "Build Number : ${BUILD_NUMBER}"
+          echo "Build Number: ${BUILD_NUMBER}"
         done
 
-      - echo "Jenkins Build Number : ${BUILD_NUMBER}"
+        echo "========================================"
+        echo "Jenkins Build Number: ${BUILD_NUMBER}"
+        echo "========================================"
 
-      - |
-        echo "Waiting for Jenkins build to finish..."
+        BUILDING=true
 
-        BUILDING="true"
-
-        while [ "$BUILDING" = "true" ]
+        while [ "${BUILDING}" = "true" ]
         do
-            sleep 10
+          sleep 10
 
-            JSON=$(curl -s \
-            -u ${JENKINS_USER}:${JENKINS_API_TOKEN} \
-            ${JENKINS_URL}/job/${JENKINS_JOB}/${BUILD_NUMBER}/api/json)
+          JSON=$(curl -s \
+            -u "${JENKINS_USER}:${JENKINS_API_TOKEN}" \
+            "${JENKINS_URL}/job/${JENKINS_JOB}/${BUILD_NUMBER}/api/json")
 
-            BUILDING=$(echo "$JSON" | jq -r '.building')
-            RESULT=$(echo "$JSON" | jq -r '.result')
+          BUILDING=$(echo "${JSON}" | jq -r '.building')
+          RESULT=$(echo "${JSON}" | jq -r '.result')
 
-            echo "Building=${BUILDING} Result=${RESULT}"
-
+          echo "Building=${BUILDING} Result=${RESULT}"
         done
 
-      - |
         echo "========================================"
         echo "Jenkins Console Output"
         echo "========================================"
 
         curl -s \
-        -u ${JENKINS_USER}:${JENKINS_API_TOKEN} \
-        ${JENKINS_URL}/job/${JENKINS_JOB}/${BUILD_NUMBER}/consoleText
+          -u "${JENKINS_USER}:${JENKINS_API_TOKEN}" \
+          "${JENKINS_URL}/job/${JENKINS_JOB}/${BUILD_NUMBER}/consoleText"
 
-      - |
         RESULT=$(curl -s \
-        -u ${JENKINS_USER}:${JENKINS_API_TOKEN} \
-        ${JENKINS_URL}/job/${JENKINS_JOB}/${BUILD_NUMBER}/api/json \
-        | jq -r '.result')
+          -u "${JENKINS_USER}:${JENKINS_API_TOKEN}" \
+          "${JENKINS_URL}/job/${JENKINS_JOB}/${BUILD_NUMBER}/api/json" \
+          | jq -r '.result')
 
-        echo "Final Jenkins Result : ${RESULT}"
+        echo "Final Jenkins Result: ${RESULT}"
 
         if [ "${RESULT}" = "SUCCESS" ]; then
-            echo "CodePipeline SUCCESS"
-            exit 0
+          echo "========================================"
+          echo "CodePipeline SUCCESS"
+          echo "========================================"
+          exit 0
         else
-            echo "CodePipeline FAILED"
-            exit 1
+          echo "========================================"
+          echo "CodePipeline FAILED"
+          echo "========================================"
+          exit 1
         fi
 
 artifacts:
