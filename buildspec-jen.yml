@@ -11,7 +11,7 @@ env:
 phases:
   install:
     commands:
-      - yum install -y jq curl
+      - yum install -y jq curl --allowerasing
 
   build:
     commands:
